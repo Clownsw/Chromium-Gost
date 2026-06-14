@@ -1,4 +1,4 @@
-From 9eb4e84f0094ca14be3dd5201564f5606b06173d Mon Sep 17 00:00:00 2001
+From f7b95f89090b4b1770d505a2880eb59b83965881 Mon Sep 17 00:00:00 2001
 From: Dmitrii Pichulin <deem@deem.ru>
 Date: Wed, 13 May 2026 13:13:11 +0300
 Subject: [PATCH] chromium GOSTSSL
@@ -17,7 +17,7 @@ Subject: [PATCH] chromium GOSTSSL
  chrome/browser/resources/new_tab_page/logo.ts |   2 +
  chrome/browser/search/search.cc               |   2 +
  chrome/browser/shell_integration_linux.cc     |   2 +-
- .../ui/startup/startup_browser_creator.cc     | 179 ++++++++++++++-
+ .../ui/startup/startup_browser_creator.cc     | 179 +++++++++++++++-
  .../toolbar/chrome_labs/chrome_labs_utils.cc  |   2 +
  .../browser/ui/views/certificate_selector.cc  |  20 +-
  .../views/toolbar/browser_app_menu_button.cc  |   1 +
@@ -36,37 +36,41 @@ Subject: [PATCH] chromium GOSTSSL
  .../template_url_prepopulate_data.cc          |  12 +-
  .../service_host/utility_process_host.cc      |   6 +
  content/browser/storage_partition_impl.cc     |   9 +
+ net/BUILD.gn                                  |   2 +
  net/base/net_error_list.h                     |   5 +
- net/cert/cert_verify_proc.cc                  |  23 ++
+ net/cert/cert_verify_proc.cc                  |  23 +++
  net/cert/x509_cert_types.cc                   |  27 +++
  net/cert/x509_cert_types.h                    |   2 +
  net/http/http_network_transaction.cc          |   9 +
  net/socket/socket.h                           |   4 +
  net/socket/ssl_client_socket.cc               |   9 +
  net/socket/ssl_client_socket.h                |   4 +
- net/socket/ssl_client_socket_impl.cc          | 204 ++++++++++++++++++
+ net/socket/ssl_client_socket_impl.cc          | 192 ++++++++++++++++++
  net/socket/ssl_client_socket_impl.h           |   8 +
- net/socket/ssl_connect_job.cc                 |  23 ++
- net/socket/ssl_connect_job.h                  |   4 +
  net/spdy/spdy_session.cc                      |   5 +
- net/ssl/client_cert_store_mac.cc              |  70 ++++++
- net/ssl/client_cert_store_nss.cc              |  72 +++++++
- net/ssl/client_cert_store_win.cc              |  71 ++++++
+ net/ssl/client_cert_store_mac.cc              |  51 +++++
+ net/ssl/client_cert_store_nss.cc              |  53 +++++
+ net/ssl/client_cert_store_win.cc              |  52 +++++
+ net/ssl/gostssl_util.cc                       |  46 +++++
+ net/ssl/gostssl_util.h                        |  16 ++
  net/ssl/openssl_ssl_util.cc                   |   4 +
- net/ssl/ssl_cipher_suite_names.cc             |  69 ++++++
+ net/ssl/ssl_cipher_suite_names.cc             |  69 +++++++
  net/ssl/ssl_config_service.cc                 |   2 +-
  net/ssl/ssl_platform_key_util.cc              |  22 ++
  net/ssl/ssl_platform_key_util.h               |   7 +
  sandbox/policy/features.cc                    |   6 +-
  sandbox/policy/mac/common.sb                  |  17 ++
  sandbox/win/src/process_mitigations.cc        |   4 +
+ services/network/network_service.cc           |   5 +
  .../renderer/core/frame/reporting_context.cc  |   8 +
  .../renderer/core/frame/reporting_context.h   |   5 +
  third_party/boringssl/BUILD.gn                |   1 +
  ui/linux/display_server_utils.cc              |   4 +-
  ui/qt/qt_ui.cc                                |  11 +
  .../cr_components/searchbox/searchbox.ts      |   8 +-
- 62 files changed, 1005 insertions(+), 57 deletions(-)
+ 64 files changed, 978 insertions(+), 57 deletions(-)
+ create mode 100644 net/ssl/gostssl_util.cc
+ create mode 100644 net/ssl/gostssl_util.h
 
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
 index cc98a1463c5..8d2479d2dad 100644
@@ -135,7 +139,7 @@ index 33c0b42d826..51f2d22fbec 100644
        <message name="IDS_GOOGLE_SEARCH_BOX_EMPTY_HINT_MULTIMODAL" desc="The text displayed in the multimodal searchbox when it is empty. It is meant to invite the user to add a text query to the existing image query in order to issue a 'multimodal' (image + text) query.">
          Add to your search
 diff --git a/chrome/app/resources/generated_resources_ru.xtb b/chrome/app/resources/generated_resources_ru.xtb
-index 542efe4b892..ab54b0569e3 100644
+index 33be5bb5f9a..00661683ea8 100644
 --- a/chrome/app/resources/generated_resources_ru.xtb
 +++ b/chrome/app/resources/generated_resources_ru.xtb
 @@ -6021,7 +6021,7 @@
@@ -1015,6 +1019,19 @@ index ab16e6b1590..5a589cf4ab9 100644
  
      if (cert && private_key) {
        mojo::PendingRemote<network::mojom::SSLPrivateKey> ssl_private_key;
+diff --git a/net/BUILD.gn b/net/BUILD.gn
+index 19c01e132bf..9456cdd3e5f 100644
+--- a/net/BUILD.gn
++++ b/net/BUILD.gn
+@@ -1129,6 +1129,8 @@ component("net") {
+     "ssl/client_cert_store.h",
+     "ssl/client_cert_store_empty.cc",
+     "ssl/client_cert_store_empty.h",
++    "ssl/gostssl_util.cc",
++    "ssl/gostssl_util.h",
+     "ssl/openssl_private_key.cc",
+     "ssl/openssl_private_key.h",
+     "ssl/openssl_ssl_util.cc",
 diff --git a/net/base/net_error_list.h b/net/base/net_error_list.h
 index 52f3b5b7db3..890c9250e1d 100644
 --- a/net/base/net_error_list.h
@@ -1209,7 +1226,7 @@ index cb52207b20d..25530af3ebe 100644
    void NotifySSLConfigChanged(SSLConfigChangeType change_type);
    void NotifySSLConfigForServersChanged(
 diff --git a/net/socket/ssl_client_socket_impl.cc b/net/socket/ssl_client_socket_impl.cc
-index 8ac44772109..8ae2054db55 100644
+index 8ac44772109..9100034846a 100644
 --- a/net/socket/ssl_client_socket_impl.cc
 +++ b/net/socket/ssl_client_socket_impl.cc
 @@ -14,6 +14,7 @@
@@ -1228,14 +1245,32 @@ index 8ac44772109..8ae2054db55 100644
  #include "base/trace_event/trace_event.h"
  #include "base/values.h"
  #include "build/build_config.h"
-@@ -350,6 +352,102 @@ int SSLClientSocketImpl::ExportKeyingMaterial(
+@@ -53,6 +55,7 @@
+ #include "net/log/net_log_event_type.h"
+ #include "net/log/net_log_values.h"
+ #include "net/ssl/cert_compression.h"
++#include "net/ssl/gostssl_util.h"
+ #include "net/ssl/openssl_ssl_util.h"
+ #include "net/ssl/ssl_cert_request_info.h"
+ #include "net/ssl/ssl_cipher_suite_names.h"
+@@ -183,6 +186,10 @@ class SSLClientSocketImpl::SSLContext {
+   friend struct base::DefaultSingletonTraits<SSLContext>;
+ 
+   SSLContext() {
++#ifndef NO_GOSTSSL
++    EnsureGostSSLCommandLineInitialized();
++#endif  // NO_GOSTSSL
++
+     ssl_socket_data_index_ =
+         SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+     DCHECK_NE(ssl_socket_data_index_, -1);
+@@ -350,6 +357,101 @@ int SSLClientSocketImpl::ExportKeyingMaterial(
    return OK;
  }
  
 +#ifndef NO_GOSTSSL
 +extern "C" {
 +void gostssl_newsession( SSL * s, const uint8_t * cachestring, size_t len, const uint8_t * cert, size_t size );
-+void gostssl_commandline( const char * ciphers, const char * tlsmode, const char * issuersfilter );
 +void gostssl_certhook( const uint8_t * cert, size_t size );
 +void gostssl_verifyhook( void * s, const char * host, int * is_gost, uint32_t * verify_result, char offline );
 +int gostssl_is_msspi( SSL * s );
@@ -1331,7 +1366,7 @@ index 8ac44772109..8ae2054db55 100644
  int SSLClientSocketImpl::Connect(CompletionOnceCallback callback) {
    // Although StreamSocket does allow calling Connect() after Disconnect(),
    // this has never worked for layered sockets. CHECK to detect any consumers
-@@ -368,6 +466,36 @@ int SSLClientSocketImpl::Connect(CompletionOnceCallback callback) {
+@@ -368,6 +470,20 @@ int SSLClientSocketImpl::Connect(CompletionOnceCallback callback) {
      return rv;
    }
  
@@ -1344,22 +1379,6 @@ index 8ac44772109..8ae2054db55 100644
 +      cert = (const void*)CRYPTO_BUFFER_data(client_cert_.get()->cert_buffer());
 +      len = (int)CRYPTO_BUFFER_len(client_cert_.get()->cert_buffer());
 +    }
-+    static bool once = false;
-+    if (once == false)
-+    {
-+      once = true;
-+      base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-+      std::string ciphers;
-+      if (command_line->HasSwitch("ciphers"))
-+        ciphers = command_line->GetSwitchValueASCII("ciphers");
-+      std::string tlsmode;
-+      if (command_line->HasSwitch("tlsmode"))
-+        tlsmode = command_line->GetSwitchValueASCII("tlsmode");
-+      std::string issuersfilter;
-+      if (command_line->HasSwitch("issuersfilter"))
-+        issuersfilter = command_line->GetSwitchValueASCII("issuersfilter");
-+      gostssl_commandline( ciphers.c_str(), tlsmode.c_str(), issuersfilter.c_str() );
-+    }
 +    std::string cachestring = std::to_string(context_->seqnum_) + "@" + host_and_port().ToString();
 +    gostssl_newsession(ssl_.get(), (const uint8_t *)cachestring.data(), cachestring.size(), (const uint8_t *)cert, len);
 +  }
@@ -1368,7 +1387,7 @@ index 8ac44772109..8ae2054db55 100644
    // Set SSL to client mode. Handshake happens in the loop below.
    SSL_set_connect_state(ssl_.get());
  
-@@ -512,6 +640,10 @@ bool SSLClientSocketImpl::GetSSLInfo(SSLInfo* ssl_info) {
+@@ -512,6 +628,10 @@ bool SSLClientSocketImpl::GetSSLInfo(SSLInfo* ssl_info) {
    ssl_info->ct_policy_compliance = server_cert_verify_result_.policy_compliance;
  
    const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl_.get());
@@ -1379,7 +1398,7 @@ index 8ac44772109..8ae2054db55 100644
    CHECK(cipher);
    // Historically, the "group" was known as "curve".
    ssl_info->key_exchange_group = SSL_get_curve_id(ssl_.get());
-@@ -908,6 +1040,9 @@ int SSLClientSocketImpl::DoHandshake() {
+@@ -908,6 +1028,9 @@ int SSLClientSocketImpl::DoHandshake() {
        return ERR_IO_PENDING;
      }
      if (ssl_error == SSL_ERROR_WANT_CERTIFICATE_VERIFY) {
@@ -1389,7 +1408,7 @@ index 8ac44772109..8ae2054db55 100644
        DCHECK(cert_verifier_request_);
        next_handshake_state_ = STATE_HANDSHAKE;
        return ERR_IO_PENDING;
-@@ -1091,6 +1226,63 @@ ssl_verify_result_t SSLClientSocketImpl::VerifyCert() {
+@@ -1091,6 +1214,63 @@ ssl_verify_result_t SSLClientSocketImpl::VerifyCert() {
      return HandleVerifyResult();
    }
  
@@ -1453,7 +1472,7 @@ index 8ac44772109..8ae2054db55 100644
    std::string_view ech_name_override = GetECHNameOverride();
    if (!ech_name_override.empty()) {
      // If ECH was offered but not negotiated, BoringSSL will ask to verify a
-@@ -1526,6 +1718,18 @@ int SSLClientSocketImpl::ClientCertRequestCallback(SSL* ssl) {
+@@ -1526,6 +1706,18 @@ int SSLClientSocketImpl::ClientCertRequestCallback(SSL* ssl) {
      return -1;
    }
  
@@ -1491,62 +1510,6 @@ index ef87745a097..b624eb33434 100644
    // Takes ownership of |stream_socket|, which may already be connected.
    // The given hostname will be compared with the name(s) in the server's
    // certificate during the SSL handshake.  |ssl_config| specifies the SSL
-diff --git a/net/socket/ssl_connect_job.cc b/net/socket/ssl_connect_job.cc
-index 67757935f82..f82e8e3f9cc 100644
---- a/net/socket/ssl_connect_job.cc
-+++ b/net/socket/ssl_connect_job.cc
-@@ -396,6 +396,11 @@ int SSLConnectJob::DoSSLConnect() {
-   }
- 
-   SSLConfig ssl_config = params_->ssl_config();
-+#ifndef NO_GOSTSSL
-+  if (tls12_fallback_retry_attempted_) {
-+    ssl_config.version_max_override = SSL_PROTOCOL_VERSION_TLS1_2;
-+  }
-+#endif  // GOSTSSL
-   ssl_config.ignore_certificate_errors =
-       *common_connect_job_params()->ignore_certificate_errors;
-   ssl_config.network_anonymization_key = params_->network_anonymization_key();
-@@ -482,6 +487,24 @@ int SSLConnectJob::DoSSLConnectComplete(int result) {
-     server_address_ = IPEndPoint();
-   }
- 
-+#ifndef NO_GOSTSSL
-+  // TLS 1.3 -> 1.2 fallback for MSSPI: one retry when versions allow downgrade.
-+  if (result != OK && !tls12_fallback_retry_attempted_ &&
-+      params_->ssl_config().version_min_override.value_or(
-+          ssl_client_context()->config().version_min) <=
-+          SSL_PROTOCOL_VERSION_TLS1_2 &&
-+      params_->ssl_config().version_max_override.value_or(
-+          ssl_client_context()->config().version_max) >=
-+          SSL_PROTOCOL_VERSION_TLS1_3) {
-+    tls12_fallback_retry_attempted_ = true;
-+    // Keep retries bounded to one TLS-version fallback.
-+    disable_legacy_crypto_with_fallback_ = false;
-+    ResetStateForRestart();
-+    next_state_ = GetInitialState(params_->GetConnectionType());
-+    return OK;
-+  }
-+#endif  // GOSTSSL
-+
-   // Historically, many servers which negotiated SHA-1 server signatures in
-   // TLS 1.2 actually support SHA-2 but preferentially sign SHA-1 if available.
-   // In order to get accurate metrics while deprecating SHA-1, we initially
-diff --git a/net/socket/ssl_connect_job.h b/net/socket/ssl_connect_job.h
-index 9127f271012..6f87e0064b6 100644
---- a/net/socket/ssl_connect_job.h
-+++ b/net/socket/ssl_connect_job.h
-@@ -202,6 +202,10 @@ class NET_EXPORT_PRIVATE SSLConnectJob : public ConnectJob,
-   // enabled.
-   bool disable_legacy_crypto_with_fallback_ = true;
- 
-+#ifndef NO_GOSTSSL
-+  bool tls12_fallback_retry_attempted_ = false;
-+#endif  // GOSTSSL
-+
-   scoped_refptr<SSLCertRequestInfo> ssl_cert_request_info_;
- 
-   ConnectionAttempts connection_attempts_;
 diff --git a/net/spdy/spdy_session.cc b/net/spdy/spdy_session.cc
 index 01c092ea928..b765a1e735b 100644
 --- a/net/spdy/spdy_session.cc
@@ -1564,55 +1527,29 @@ index 01c092ea928..b765a1e735b 100644
    CHECK(GetSSLInfo(&ssl_info));
  
 diff --git a/net/ssl/client_cert_store_mac.cc b/net/ssl/client_cert_store_mac.cc
-index c92d91d72dd..140c90fe037 100644
+index c92d91d72dd..66cdbe8cca8 100644
 --- a/net/ssl/client_cert_store_mac.cc
 +++ b/net/ssl/client_cert_store_mac.cc
-@@ -19,6 +19,7 @@
- 
- #include "base/apple/osstatus_logging.h"
- #include "base/apple/scoped_cftyperef.h"
-+#include "base/command_line.h"
- #include "base/functional/bind.h"
- #include "base/functional/callback.h"
- #include "base/functional/callback_helpers.h"
-@@ -298,6 +299,13 @@ void AddIdentity(ScopedCFTypeRef<SecIdentityRef> sec_identity,
+@@ -298,6 +298,12 @@ void AddIdentity(ScopedCFTypeRef<SecIdentityRef> sec_identity,
    }
  }
  
 +#ifndef NO_GOSTSSL
 +extern "C" {
 +void gostssl_clientcertshook( const uint8_t *** certs, size_t ** lens, const wchar_t *** names, size_t * count, int * is_gost, const uint8_t ** issuers, const size_t * issuers_lens, size_t issuers_count );
-+void gostssl_commandline( const char * ciphers, const char * tlsmode, const char * issuersfilter );
 +}
 +#endif // GOSTSSL
 +
  ClientCertIdentityList GetClientCertsOnBackgroundThread(
      scoped_refptr<const SSLCertRequestInfo> request) {
    std::string server_domain = request->host_and_port.host();
-@@ -353,6 +361,68 @@ ClientCertIdentityList GetClientCertsOnBackgroundThread(
+@@ -353,6 +359,51 @@ ClientCertIdentityList GetClientCertsOnBackgroundThread(
    GetClientCertsImpl(std::move(preferred_identity),
                       std::move(regular_identities), *request, true,
                       &selected_identities);
 +
 +#ifndef NO_GOSTSSL
 +  {
-+    static bool once = false;
-+    if (once == false)
-+    {
-+      once = true;
-+      base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-+      std::string ciphers;
-+      if (command_line->HasSwitch("ciphers"))
-+        ciphers = command_line->GetSwitchValueASCII("ciphers");
-+      std::string tlsmode;
-+      if (command_line->HasSwitch("tlsmode"))
-+        tlsmode = command_line->GetSwitchValueASCII("tlsmode");
-+      std::string issuersfilter;
-+      if (command_line->HasSwitch("issuersfilter"))
-+        issuersfilter = command_line->GetSwitchValueASCII("issuersfilter");
-+      gostssl_commandline( ciphers.c_str(), tlsmode.c_str(), issuersfilter.c_str() );
-+    }
-+
 +    const uint8_t ** certs;
 +    size_t * lens;
 +    size_t count;
@@ -1659,55 +1596,29 @@ index c92d91d72dd..140c90fe037 100644
  }
  
 diff --git a/net/ssl/client_cert_store_nss.cc b/net/ssl/client_cert_store_nss.cc
-index 049a61fefb8..efdf469ede3 100644
+index 049a61fefb8..7a122e833a9 100644
 --- a/net/ssl/client_cert_store_nss.cc
 +++ b/net/ssl/client_cert_store_nss.cc
-@@ -13,6 +13,7 @@
- #include <utility>
- #include <vector>
- 
-+#include "base/command_line.h"
- #include "base/functional/bind.h"
- #include "base/functional/callback_helpers.h"
- #include "base/location.h"
-@@ -133,6 +134,13 @@ void ClientCertStoreNSS::FilterCertsOnWorkerThread(
+@@ -133,6 +133,12 @@ void ClientCertStoreNSS::FilterCertsOnWorkerThread(
    FilterMatchingClientCertIdentities(identities, request, sources);
  }
  
 +#ifndef NO_GOSTSSL
 +extern "C" {
 +void gostssl_clientcertshook( const uint8_t *** certs, size_t ** lens, const wchar_t *** names, size_t * count, int * is_gost, const uint8_t ** issuers, const size_t * issuers_lens, size_t issuers_count );
-+void gostssl_commandline( const char * ciphers, const char * tlsmode, const char * issuersfilter );
 +}
 +#endif // GOSTSSL
 +
  // static
  ClientCertIdentityList ClientCertStoreNSS::GetAndFilterCertsOnWorkerThread(
      scoped_refptr<crypto::CryptoModuleBlockingPasswordDelegate>
-@@ -148,6 +156,70 @@ ClientCertIdentityList ClientCertStoreNSS::GetAndFilterCertsOnWorkerThread(
+@@ -148,6 +154,53 @@ ClientCertIdentityList ClientCertStoreNSS::GetAndFilterCertsOnWorkerThread(
    GetPlatformCertsOnWorkerThread(std::move(password_delegate), CertFilter(),
                                   &selected_identities);
    FilterCertsOnWorkerThread(&selected_identities, *request);
 +
 +#ifndef NO_GOSTSSL
 +  {
-+    static bool once = false;
-+    if (once == false)
-+    {
-+      once = true;
-+      base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-+      std::string ciphers;
-+      if (command_line->HasSwitch("ciphers"))
-+        ciphers = command_line->GetSwitchValueASCII("ciphers");
-+      std::string tlsmode;
-+      if (command_line->HasSwitch("tlsmode"))
-+        tlsmode = command_line->GetSwitchValueASCII("tlsmode");
-+      std::string issuersfilter;
-+      if (command_line->HasSwitch("issuersfilter"))
-+        issuersfilter = command_line->GetSwitchValueASCII("issuersfilter");
-+      gostssl_commandline( ciphers.c_str(), tlsmode.c_str(), issuersfilter.c_str() );
-+    }
-+
 +    const uint8_t ** certs;
 +    size_t * lens;
 +    size_t count;
@@ -1756,54 +1667,28 @@ index 049a61fefb8..efdf469ede3 100644
  }
  
 diff --git a/net/ssl/client_cert_store_win.cc b/net/ssl/client_cert_store_win.cc
-index 29f6b979931..617bba1a30d 100644
+index 29f6b979931..299ed18c7d3 100644
 --- a/net/ssl/client_cert_store_win.cc
 +++ b/net/ssl/client_cert_store_win.cc
-@@ -15,6 +15,7 @@
- #include <security.h>
- #include <wincrypt.h>
- 
-+#include "base/command_line.h"
- #include "base/compiler_specific.h"
- #include "base/containers/span.h"
- #include "base/functional/bind.h"
-@@ -108,6 +109,13 @@ static BOOL WINAPI ClientCertFindCallback(PCCERT_CONTEXT cert_context,
+@@ -108,6 +108,12 @@ static BOOL WINAPI ClientCertFindCallback(PCCERT_CONTEXT cert_context,
    return TRUE;
  }
  
 +#ifndef NO_GOSTSSL
 +extern "C" {
 +void gostssl_clientcertshook( const uint8_t *** certs, size_t ** lens, const wchar_t *** names, size_t * count, int * is_gost, const uint8_t ** issuers, const size_t * issuers_lens, size_t issuers_count );
-+void gostssl_commandline( const char * ciphers, const char * tlsmode, const char * issuersfilter );
 +}
 +#endif // GOSTSSL
 +
  ClientCertIdentityList GetClientCertsImpl(HCERTSTORE cert_store,
                                            const SSLCertRequestInfo& request) {
    ClientCertIdentityList selected_identities;
-@@ -211,6 +219,69 @@ ClientCertIdentityList GetClientCertsImpl(HCERTSTORE cert_store,
+@@ -211,6 +217,52 @@ ClientCertIdentityList GetClientCertsImpl(HCERTSTORE cert_store,
      }
    }
  
 +#ifndef NO_GOSTSSL
 +  {
-+    static bool once = false;
-+    if (once == false)
-+    {
-+      once = true;
-+      base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
-+      std::string ciphers;
-+      if (command_line->HasSwitch("ciphers"))
-+        ciphers = command_line->GetSwitchValueASCII("ciphers");
-+      std::string tlsmode;
-+      if (command_line->HasSwitch("tlsmode"))
-+        tlsmode = command_line->GetSwitchValueASCII("tlsmode");
-+      std::string issuersfilter;
-+      if (command_line->HasSwitch("issuersfilter"))
-+        issuersfilter = command_line->GetSwitchValueASCII("issuersfilter");
-+      gostssl_commandline( ciphers.c_str(), tlsmode.c_str(), issuersfilter.c_str() );
-+    }
-+
 +    const uint8_t ** certs;
 +    size_t * lens;
 +    size_t count;
@@ -1851,6 +1736,80 @@ index 29f6b979931..617bba1a30d 100644
    std::sort(selected_identities.begin(), selected_identities.end(),
              ClientCertIdentitySorter());
    return selected_identities;
+diff --git a/net/ssl/gostssl_util.cc b/net/ssl/gostssl_util.cc
+new file mode 100644
+index 00000000000..84a02f3dd35
+--- /dev/null
++++ b/net/ssl/gostssl_util.cc
+@@ -0,0 +1,46 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "net/ssl/gostssl_util.h"
++
++#ifndef NO_GOSTSSL
++
++#include <mutex>
++#include <string>
++
++#include "base/command_line.h"
++
++extern "C" {
++void gostssl_commandline(const char* ciphers,
++                         const char* tlsmode,
++                         const char* issuersfilter);
++}
++
++namespace net {
++
++void EnsureGostSSLCommandLineInitialized() {
++  static std::once_flag once;
++  std::call_once(once, [] {
++    base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
++
++    std::string ciphers;
++    if (command_line->HasSwitch("ciphers"))
++      ciphers = command_line->GetSwitchValueASCII("ciphers");
++
++    std::string tlsmode;
++    if (command_line->HasSwitch("tlsmode"))
++      tlsmode = command_line->GetSwitchValueASCII("tlsmode");
++
++    std::string issuersfilter;
++    if (command_line->HasSwitch("issuersfilter"))
++      issuersfilter = command_line->GetSwitchValueASCII("issuersfilter");
++
++    gostssl_commandline(ciphers.c_str(), tlsmode.c_str(),
++                        issuersfilter.c_str());
++  });
++}
++
++}  // namespace net
++
++#endif  // NO_GOSTSSL
+diff --git a/net/ssl/gostssl_util.h b/net/ssl/gostssl_util.h
+new file mode 100644
+index 00000000000..902624321a5
+--- /dev/null
++++ b/net/ssl/gostssl_util.h
+@@ -0,0 +1,16 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#ifndef NET_SSL_GOSTSSL_UTIL_H_
++#define NET_SSL_GOSTSSL_UTIL_H_
++
++namespace net {
++
++#ifndef NO_GOSTSSL
++void EnsureGostSSLCommandLineInitialized();
++#endif  // NO_GOSTSSL
++
++}  // namespace net
++
++#endif  // NET_SSL_GOSTSSL_UTIL_H_
 diff --git a/net/ssl/openssl_ssl_util.cc b/net/ssl/openssl_ssl_util.cc
 index 09b38ddb174..d2b58f6d253 100644
 --- a/net/ssl/openssl_ssl_util.cc
@@ -2117,6 +2076,29 @@ index abc9837b2b0..d5ee53233cb 100644
    }
  
    // Enable image load policies.
+diff --git a/services/network/network_service.cc b/services/network/network_service.cc
+index 3989a72d732..cb3e277e9f6 100644
+--- a/services/network/network_service.cc
++++ b/services/network/network_service.cc
+@@ -77,6 +77,7 @@
+ #include "net/log/net_log_util.h"
+ #include "net/nqe/network_quality_estimator.h"
+ #include "net/socket/client_socket_pool_manager.h"
++#include "net/ssl/gostssl_util.h"
+ #include "net/ssl/ssl_key_logger_impl.h"
+ #include "net/url_request/url_request_context.h"
+ #include "services/network/dns_config_change_manager.h"
+@@ -424,6 +425,10 @@ void NetworkService::Initialize(mojom::NetworkServiceParamsPtr params,
+ 
+   initialized_ = true;
+ 
++#ifndef NO_GOSTSSL
++  net::EnsureGostSSLCommandLineInitialized();
++#endif  // NO_GOSTSSL
++
+ #if BUILDFLAG(IS_ANDROID) && defined(ARCH_CPU_ARMEL)
+   // Measure Android kernels with missing AT_HWCAP2 auxv fields. See
+   // https://crbug.com/boringssl/46.
 diff --git a/third_party/blink/renderer/core/frame/reporting_context.cc b/third_party/blink/renderer/core/frame/reporting_context.cc
 index 9b146e778a8..fbd6fe8e341 100644
 --- a/third_party/blink/renderer/core/frame/reporting_context.cc

@@ -94,6 +94,7 @@ static const SSL_CIPHER * tls_FF85 = NULL;
 
 static std::string & g_ciphers = *new std::string;
 static int g_tlsmode = 2;
+static bool g_tlsmode_set = false;
 static int g_issuersfilter = 2;
 
 #define TLS_FLAG_V1_0 ( 1 << 0 )
@@ -153,6 +154,10 @@ int gostssl_init()
         init_status |= TLS_FLAG_V1_2;
     if( tls13 && cipher_tls13 )
         init_status |= TLS_FLAG_V1_3;
+
+    // If tlsmode is not set explicitly, prefer lower TLS versions when available.
+    if( !g_tlsmode_set && ( init_status & TLS_FLAG_V1_3 ) && ( init_status & ~TLS_FLAG_V1_3 ) )
+        init_status &= ~TLS_FLAG_V1_3;
 
     if( init_status == 0 && cipher_any )
         init_status = TLS_FLAG_V1_0;
@@ -828,7 +833,8 @@ void gostssl_commandline( const char * ciphers, const char * tlsmode, const char
         g_ciphers += "C030:C02F:C028:C027:C014:C013:009D:009C:003D:003C:0035:002F:000A"; // TLS RSA
     }
 
-    if( tlsmode && strlen( tlsmode ) )
+    g_tlsmode_set = tlsmode && strlen( tlsmode );
+    if( g_tlsmode_set )
         g_tlsmode = atoi( tlsmode );
     else
         g_tlsmode = 2;
