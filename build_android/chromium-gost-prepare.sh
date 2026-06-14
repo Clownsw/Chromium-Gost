@@ -59,14 +59,8 @@ cp -f $CHROMIUM_GOST_REPO/src/msspi/src/msspi.cpp third_party/boringssl/msspi.cp
 cp -f $CHROMIUM_GOST_REPO/src/msspi/src/msspi.h third_party/boringssl/msspi.h
 cp -f $CHROMIUM_GOST_REPO/src/msspi/src/capix.hpp third_party/boringssl/capix.hpp
 
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/CSP_SChannel.h third_party/boringssl/src/include/CSP_SChannel.h
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/CSP_Sspi.h third_party/boringssl/src/include/CSP_Sspi.h
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/CSP_WinBase.h third_party/boringssl/src/include/CSP_WinBase.h
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/CSP_WinCrypt.h third_party/boringssl/src/include/CSP_WinCrypt.h
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/CSP_WinDef.h third_party/boringssl/src/include/CSP_WinDef.h
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/CSP_WinError.h third_party/boringssl/src/include/CSP_WinError.h
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/WinCryptEx.h third_party/boringssl/src/include/WinCryptEx.h
-cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/common.h third_party/boringssl/src/include/common.h
+cp -f $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/*.h third_party/boringssl/src/include/
+cp -Rf $CHROMIUM_GOST_REPO/src/msspi/third_party/cprocsp/include/cpcsp third_party/boringssl/src/include/
 
 cd $BORINGSSL_PATH
 git checkout -f -b temp

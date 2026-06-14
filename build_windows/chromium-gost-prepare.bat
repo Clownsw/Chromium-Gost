@@ -51,14 +51,8 @@ copy /y %CHROMIUM_GOST_REPO%\src\gostssl.cpp third_party\boringssl\gostssl.cpp
 copy /y %CHROMIUM_GOST_REPO%\src\msspi\src\msspi.cpp third_party\boringssl\msspi.cpp
 copy /y %CHROMIUM_GOST_REPO%\src\msspi\src\msspi.h third_party\boringssl\msspi.h
 
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\CSP_SChannel.h third_party\boringssl\src\include\CSP_SChannel.h
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\CSP_Sspi.h third_party\boringssl\src\include\CSP_Sspi.h
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\CSP_WinBase.h third_party\boringssl\src\include\CSP_WinBase.h
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\CSP_WinCrypt.h third_party\boringssl\src\include\CSP_WinCrypt.h
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\CSP_WinDef.h third_party\boringssl\src\include\CSP_WinDef.h
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\CSP_WinError.h third_party\boringssl\src\include\CSP_WinError.h
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\WinCryptEx.h third_party\boringssl\src\include\WinCryptEx.h
-copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\common.h third_party\boringssl\src\include\common.h
+copy /y %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\*.h third_party\boringssl\src\include\
+xcopy /y /e /i %CHROMIUM_GOST_REPO%\src\msspi\third_party\cprocsp\include\cpcsp third_party\boringssl\src\include\cpcsp
 
 cd %BORINGSSL_PATH%
 call git checkout -f -b temp
