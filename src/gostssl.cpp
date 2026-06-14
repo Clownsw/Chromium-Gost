@@ -66,7 +66,7 @@ DLLEXPORT void gostssl_commandline( const char * ciphers, const char * tlsmode, 
 #include "CSP_WinDef.h"
 #include "CSP_WinCrypt.h"
 #endif // WIN32
-#include "WinCryptEx.h"
+#include "cpcsp/WinCryptEx.h"
 
 #include <stdio.h>
 #include <string.h>
