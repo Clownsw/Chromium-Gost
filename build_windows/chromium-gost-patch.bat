@@ -16,6 +16,4 @@ cmd /C "git format-patch HEAD~1 --stdout > %CHROMIUM_GOST_REPO%patch\boringssl.s
 cd %CHROMIUM_PATH%\third_party\search_engines_data\resources
 cmd /C "git format-patch HEAD~1 --stdout > %CHROMIUM_GOST_REPO%patch\search_engines_data.stage.patch"
 
-curl -o %CHROMIUM_GOST_REPO%patch\extra\extensions-manifestv2.patch https://raw.githubusercontent.com/ungoogled-software/ungoogled-chromium/refs/heads/master/patches/core/ungoogled-chromium/extensions-manifestv2.patch
-
 cmd

@@ -1,41 +1,45 @@
-From 83ae59af4db3abcf3c4bee088e5ae3b56a982a94 Mon Sep 17 00:00:00 2001
+From de840bbd6ad55dfe55e82460f22b57f34aab8383 Mon Sep 17 00:00:00 2001
 From: Dmitrii Pichulin <deem@deem.ru>
-Date: Wed, 13 May 2026 12:28:19 +0300
+Date: Thu, 9 Jul 2026 02:13:41 +0300
 Subject: [PATCH] no glic and ai
 
 ---
- chrome/browser/ai/ai_manager.cc               |  4 ++++
+ chrome/browser/ai/ai_manager.cc               |  5 +++++
  ...ization_guide_on_device_model_installer.cc | 11 +++++++++++
  chrome/browser/glic/public/glic_enabling.cc   |  4 ++++
  .../optimization_guide_keyed_service.cc       | 19 +++++++++++++++++++
  ...device_head_suggest_component_installer.cc |  6 ++++++
  .../core/optimization_guide_features.cc       |  8 ++++++++
- 6 files changed, 52 insertions(+)
+ 6 files changed, 53 insertions(+)
 
 diff --git a/chrome/browser/ai/ai_manager.cc b/chrome/browser/ai/ai_manager.cc
-index 05e0431b79..64bdf34519 100644
+index fc639e5ab89..5bf0a9a4e2a 100644
 --- a/chrome/browser/ai/ai_manager.cc
 +++ b/chrome/browser/ai/ai_manager.cc
-@@ -384,10 +384,14 @@ AIManager::AIManager(content::BrowserContext* browser_context,
- AIManager::~AIManager() = default;
+@@ -1711,6 +1711,10 @@ bool AIManager::CheckAndFixLanguages(
  
- bool AIManager::IsBuiltInAIAPIsEnabledByPolicy() {
+ std::optional<blink::mojom::ModelAvailabilityCheckResult>
+ AIManager::GetPrefBlockedResult() {
 +#ifndef NO_GOSTSSL
-+  return false;
++  return blink::mojom::ModelAvailabilityCheckResult::
++      kUnavailableEnterprisePolicyDisabled;
 +#else
-   PrefService* prefs =
-       Profile::FromBrowserContext(browser_context_)->GetPrefs();
-   return !prefs->HasPrefPath(policy::policy_prefs::kBuiltInAIAPIsEnabled) ||
-          prefs->GetBoolean(policy::policy_prefs::kBuiltInAIAPIsEnabled);
-+#endif // NO_GOSTSSL
+   PrefService* local_state = g_browser_process->local_state();
+   // chromeenterprise.google/policies/#GenAILocalFoundationalModelSettings
+   if (optimization_guide::
+@@ -1738,6 +1742,7 @@ AIManager::GetPrefBlockedResult() {
+   }
+ 
+   return std::nullopt;
++#endif  // NO_GOSTSSL
  }
  
- void AIManager::AddReceiver(
+ bool AIManager::IsPermissionsPolicyBlocked(
 diff --git a/chrome/browser/component_updater/optimization_guide_on_device_model_installer.cc b/chrome/browser/component_updater/optimization_guide_on_device_model_installer.cc
-index 57c945e0b9..ffe5011ea3 100644
+index abf684b7ef0..f8fd3543cce 100644
 --- a/chrome/browser/component_updater/optimization_guide_on_device_model_installer.cc
 +++ b/chrome/browser/component_updater/optimization_guide_on_device_model_installer.cc
-@@ -264,6 +264,11 @@ class OnDeviceModelComponentStateManagerDelegate final
+@@ -275,6 +275,11 @@ class OnDeviceModelComponentStateManagerDelegate final
            state_manager,
        optimization_guide::OnDeviceModelRegistrationAttributes attributes)
        override {
@@ -47,7 +51,7 @@ index 57c945e0b9..ffe5011ea3 100644
      DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
      if (!g_browser_process) {
        return;
-@@ -282,6 +287,7 @@ class OnDeviceModelComponentStateManagerDelegate final
+@@ -293,6 +298,7 @@ class OnDeviceModelComponentStateManagerDelegate final
      base::MakeRefCounted<ComponentInstaller>(
          CreateInstallerPolicy(state_manager, std::move(attributes)))
          ->Register(cus, std::move(register_callback));
@@ -55,7 +59,7 @@ index 57c945e0b9..ffe5011ea3 100644
    }
  
    void Uninstall(
-@@ -296,12 +302,17 @@ class OnDeviceModelComponentStateManagerDelegate final
+@@ -307,12 +313,17 @@ class OnDeviceModelComponentStateManagerDelegate final
    }
  
    void RequestUpdate(bool is_background) override {
@@ -74,29 +78,29 @@ index 57c945e0b9..ffe5011ea3 100644
  
    std::string GetComponentId() override {
 diff --git a/chrome/browser/glic/public/glic_enabling.cc b/chrome/browser/glic/public/glic_enabling.cc
-index fdd2b0d1ab..417f026074 100644
+index 5adb0a6b773..01ad0a3434e 100644
 --- a/chrome/browser/glic/public/glic_enabling.cc
 +++ b/chrome/browser/glic/public/glic_enabling.cc
-@@ -494,6 +494,9 @@ bool GlicGlobalEnabling::IsSystemRequirementMet() const {
+@@ -587,6 +587,9 @@ bool GlicGlobalEnabling::IsOsVersionSupported() const {
  }
  
- bool GlicGlobalEnabling::IsEnabledByFlags() {
+ bool GlicGlobalEnabling::IsEnabledByGlobalCriteria() {
 +#ifndef NO_GOSTSSL
 +  return false;
 +#else
    if (g_bypass_enablement_checks_for_testing) {
      return true;
    }
-@@ -504,6 +507,7 @@ bool GlicGlobalEnabling::IsEnabledByFlags() {
+@@ -597,6 +600,7 @@ bool GlicGlobalEnabling::IsEnabledByGlobalCriteria() {
                      country_enablement_.value_or(true);
  
-   return is_enabled && IsSystemRequirementMet();
+   return is_enabled && IsOsVersionSupported() && IsSystemRequirementMet();
 +#endif  // NO_GOSTSSL
  }
  
- bool GlicEnabling::IsEnabledByFlags() {
+ // static
 diff --git a/chrome/browser/optimization_guide/optimization_guide_keyed_service.cc b/chrome/browser/optimization_guide/optimization_guide_keyed_service.cc
-index 682a953b9d..df5967c36a 100644
+index f073a2f6b30..56cbc5bd515 100644
 --- a/chrome/browser/optimization_guide/optimization_guide_keyed_service.cc
 +++ b/chrome/browser/optimization_guide/optimization_guide_keyed_service.cc
 @@ -639,22 +639,32 @@ void OptimizationGuideKeyedService::AllowUnsignedUserForTesting(
@@ -163,7 +167,7 @@ index 682a953b9d..df5967c36a 100644
  
  void OptimizationGuideKeyedService::AddModelExecutionSettingsEnabledObserver(
 diff --git a/components/component_updater/installer_policies/on_device_head_suggest_component_installer.cc b/components/component_updater/installer_policies/on_device_head_suggest_component_installer.cc
-index 7e85efc9ef..d9deaa1030 100644
+index 7e85efc9ef5..d9deaa10303 100644
 --- a/components/component_updater/installer_policies/on_device_head_suggest_component_installer.cc
 +++ b/components/component_updater/installer_policies/on_device_head_suggest_component_installer.cc
 @@ -137,6 +137,11 @@ OnDeviceHeadSuggestInstallerPolicy::GetInstallerAttributes() const {
@@ -187,7 +191,7 @@ index 7e85efc9ef..d9deaa1030 100644
  
  }  // namespace component_updater
 diff --git a/components/optimization_guide/core/optimization_guide_features.cc b/components/optimization_guide/core/optimization_guide_features.cc
-index 8eca79812b..b1d523eb5c 100644
+index 81733e862a6..c12ecd591dd 100644
 --- a/components/optimization_guide/core/optimization_guide_features.cc
 +++ b/components/optimization_guide/core/optimization_guide_features.cc
 @@ -486,14 +486,22 @@ base::TimeDelta GetOnDeviceStartupMetricDelay() {
