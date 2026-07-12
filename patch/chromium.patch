@@ -1,9 +1,10 @@
-From ba5aa9a6d21727715bd4cce9fd1bc0952a3fcebb Mon Sep 17 00:00:00 2001
+From a730c890e51e64e36c0d88667516791f7e08495f Mon Sep 17 00:00:00 2001
 From: Dmitrii Pichulin <deem@deem.ru>
 Date: Wed, 13 May 2026 13:13:11 +0300
 Subject: [PATCH] chromium GOSTSSL
 
 ---
+ BUILD.gn                                      |   2 +-
  chrome/BUILD.gn                               |   8 +-
  chrome/app/app-entitlements.plist             |   8 +
  chrome/app/generated_resources.grd            |   2 -
@@ -72,10 +73,23 @@ Subject: [PATCH] chromium GOSTSSL
  third_party/boringssl/BUILD.gn                |   1 +
  ui/linux/display_server_utils.cc              |   4 +-
  ui/qt/qt_ui.cc                                |  11 +
- 68 files changed, 989 insertions(+), 70 deletions(-)
+ 69 files changed, 990 insertions(+), 71 deletions(-)
  create mode 100644 net/ssl/gostssl_util.cc
  create mode 100644 net/ssl/gostssl_util.h
 
+diff --git a/BUILD.gn b/BUILD.gn
+index 6fb99965414..b790e61f44f 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -588,7 +588,7 @@ group("gn_all") {
+       }
+ 
+       if (!is_debug && !is_component_build && !is_castos) {
+-        deps += [ "//chrome/tools/service_discovery_sniffer" ]
++        # deps += [ "//chrome/tools/service_discovery_sniffer" ]
+       }
+     }
+ 
 diff --git a/chrome/BUILD.gn b/chrome/BUILD.gn
 index 18417167ff8..a6f814eb258 100644
 --- a/chrome/BUILD.gn
